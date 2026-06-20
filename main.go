@@ -44,6 +44,7 @@ type dmsConfig struct {
 	NoTranscode         bool
 	ForceTranscodeTo    string
 	NoProbe             bool
+	MaxConcurrentProbes int
 	StallEventSubscribe bool
 	NotifyInterval      time.Duration
 	IgnoreHidden        bool
@@ -142,6 +143,7 @@ func mainErr() error {
 	transcodeLogPattern := flag.String("transcodeLogPattern", "", "pattern where to write transcode logs to. The [tsname] placeholder is replaced with the name of the item currently being played. The default is $HOME/.dms/log/[tsname]")
 	flag.BoolVar(&config.NoTranscode, "noTranscode", false, "disable transcoding")
 	flag.BoolVar(&config.NoProbe, "noProbe", false, "disable media probing with ffprobe")
+	flag.IntVar(&config.MaxConcurrentProbes, "maxConcurrentProbes", runtime.NumCPU(), "max number of ffprobe process spawned concurrently")
 	flag.BoolVar(&config.StallEventSubscribe, "stallEventSubscribe", false, "workaround for some bad event subscribers")
 	flag.DurationVar(&config.NotifyInterval, "notifyInterval", 30*time.Second, "interval between SSPD announces")
 	flag.BoolVar(&config.IgnoreHidden, "ignoreHidden", false, "ignore hidden files and directories")
@@ -258,6 +260,7 @@ func mainErr() error {
 		ForceTranscodeTo:    config.ForceTranscodeTo,
 		TranscodeLogPattern: config.TranscodeLogPattern,
 		NoProbe:             config.NoProbe,
+		MaxConcurrentProbes: config.MaxConcurrentProbes,
 		Icons: func() []dms.Icon {
 			var icons []dms.Icon
 			for _, size := range config.DeviceIconSizes {

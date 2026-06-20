@@ -265,7 +265,10 @@ type Server struct {
 	ForceTranscodeTo string
 	// Disable media probing with ffprobe
 	NoProbe bool
-	Icons   []Icon
+	// Maximum amount of ffprobe process spawned concurrently
+	MaxConcurrentProbes int
+	concurrentProbes    chan struct{}
+	Icons               []Icon
 	// Stall event subscription requests until they drop. A workaround for
 	// some bad clients.
 	StallEventSubscribe bool
@@ -289,6 +292,7 @@ type Server struct {
 	Logger              *slog.Logger
 	eventingLogger      *slog.Logger
 	FS                  fs.FS
+	fsPath              string
 }
 
 // UPnP SOAP service.
@@ -471,7 +475,8 @@ func (me *Server) serveDLNATranscode(w http.ResponseWriter, r *http.Request, pat
 		}
 		logFile = aLogFile
 	}
-	p, err := ts.Transcode(path_, range_.Start, range_.End-range_.Start, logFile)
+	fullPath := filepath.Join(me.fsPath, path_)
+	p, err := ts.Transcode(fullPath, range_.Start, range_.End-range_.Start, logFile)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -960,6 +965,7 @@ func (srv *Server) Init() (err error) {
 	if srv.FS == nil {
 		fsys := os.DirFS(srv.RootObjectPath)
 		srv.FS = fsys
+		srv.fsPath = srv.RootObjectPath
 	}
 	srv.RootObjectPath = "./"
 	srv.eventingLogger = srv.Logger.With(slog.String("subsystem", "eventing"))
@@ -1042,6 +1048,7 @@ func (srv *Server) Init() (err error) {
 	srv.Logger.Info("HTTP server", "address", srv.HTTPConn.Addr())
 	srv.initMux(srv.httpServeMux)
 	srv.ssdpStopped = make(chan struct{})
+	srv.concurrentProbes = make(chan struct{}, srv.MaxConcurrentProbes)
 	return nil
 }
 
@@ -1066,6 +1073,7 @@ func (srv *Server) Run() (err error) {
 func (srv *Server) Close() (err error) {
 	close(srv.closed)
 	err = srv.HTTPConn.Close()
+	close(srv.concurrentProbes)
 	<-srv.ssdpStopped
 	return
 }
@@ -1094,6 +1102,11 @@ func (me *Server) location(ip net.IP) string {
 
 // Can return nil info with nil err if an earlier Probe gave an error.
 func (srv *Server) ffmpegProbe(path string) (info *ffprobe.Info, err error) {
+	srv.concurrentProbes <- struct{}{}
+	defer func() {
+		<-srv.concurrentProbes
+	}()
+
 	fi, err := fs.Stat(srv.FS, path)
 	if err != nil {
 		return
@@ -1101,8 +1114,8 @@ func (srv *Server) ffmpegProbe(path string) (info *ffprobe.Info, err error) {
 	key := ffmpegInfoCacheKey{path, fi.ModTime().UnixNano()}
 	value, ok := srv.FFProbeCache.Get(key)
 	if !ok {
-		uri := fmt.Sprintf("http://127.0.0.1:%d%s?path=%s", srv.httpPort(), resPath, path)
-		info, err = ffprobe.Run(uri)
+		fullPath := filepath.Join(srv.fsPath, path)
+		info, err = ffprobe.Run(fullPath)
 		err = suppressFFmpegProbeDataErrors(err)
 		srv.FFProbeCache.Set(key, info)
 		return
