@@ -967,6 +967,9 @@ func (s *Server) initServices() (err error) {
 }
 
 func (srv *Server) Init() (err error) {
+	if _, ok := transcodes[srv.ForceTranscodeTo]; !ok {
+		return fmt.Errorf("unsupported -forceTranscodeTo format %q", srv.ForceTranscodeTo)
+	}
 	if srv.FS == nil {
 		fsys := os.DirFS(srv.RootObjectPath)
 		srv.FS = fsys
