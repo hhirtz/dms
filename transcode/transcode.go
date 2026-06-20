@@ -166,6 +166,27 @@ func WebTranscode(path string, start, length time.Duration, stderr io.Writer) (r
 	return transcodePipe(args, stderr)
 }
 
+// Returns a stream of untouched video and AAC audio
+func AACStereoTranscode(path string, start, length time.Duration, stderr io.Writer) (r io.ReadCloser, err error) {
+	args := []string{
+		"ffmpeg",
+		"-ss", FormatDurationSexagesimal(start),
+		"-i", path,
+		"-c:v", "copy",
+		"-c:a", "aac", "-ab", "512k", "-ar", "44100", "-ac", "2",
+	}
+	if length > 0 {
+		args = append(args, []string{
+			"-t", FormatDurationSexagesimal(length),
+		}...)
+	}
+	args = append(args, []string{
+		"-f", "matroska",
+		"pipe:",
+	}...)
+	return transcodePipe(args, stderr)
+}
+
 // credit laurent @ https://stackoverflow.com/questions/34118732/parse-a-command-line-string-into-flags-and-arguments-in-golang
 func parseCommandLine(command string) ([]string, error) {
 	var args []string
