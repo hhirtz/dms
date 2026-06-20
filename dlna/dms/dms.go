@@ -75,6 +75,7 @@ var transcodes = map[string]transcodeSpec{
 	"vp8":        {mimeType: "video/webm", Transcode: transcode.VP8Transcode},
 	"chromecast": {mimeType: "video/mp4", Transcode: transcode.ChromecastTranscode},
 	"web":        {mimeType: "video/mp4", Transcode: transcode.WebTranscode},
+	"aac-stereo": {mimeType: "video/x-matroska", Transcode: transcode.AACStereoTranscode},
 }
 
 func makeDeviceUuid(unique string) string {
