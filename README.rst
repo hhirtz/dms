@@ -1,3 +1,11 @@
+Fork
+====
+
+This is a dms fork with additional features:
+- -path works
+- cap on concurrent ffprobe processes to avoid eating all RAM
+- the `aac-stereo` transcode setting
+
 Funding
 =======
 
